@@ -49,7 +49,6 @@ view_state = pdk.ViewState(
 st.pydeck_chart(pdk.Deck(
     layers=[layer],
     initial_view_state=view_state,
-    map_style="mapbox://styles/mapbox/light-v10", # 乾淨的白色地圖底色
     tooltip={
         "html": """
             <div style="font-family: sans-serif; padding: 5px;">
