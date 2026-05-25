@@ -4,6 +4,9 @@ import io
 import time
 from geopy.geocoders import Nominatim
 
+# 🔗 【重要設定】請在下方的雙引號內，貼上您在 Google 表單發布的 CSV 長網址
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR0Ib-gcIDvdoiTJovsjUAflUoA_-NRtg6ZfSdoonmhRSbkc_4bdzzI0w5FbD-DEBI53Vpg3PeALzid/pub?output=csv"
+
 def fetch_and_clean_all():
     print("🔄 嘗試連線至內政部與開放 API 縣市資料庫...")
     target_urls = [
@@ -38,45 +41,39 @@ def fetch_and_clean_all():
             pass
     return all_clan_data
 
-def add_gps_and_save(df):
-    # 👑 已為您補齊全台主要宗親會的負責人姓名
-    final_data = [
-        {"名稱": "世界謝氏宗親總會", "負責人": "謝宗翰", "地址": "台北市中山區吉林路286號", "緯度": 25.0645, "經度": 121.5295, "簡介": "全國性宗親總會"},
-        {"名稱": "台灣謝氏宗親總會", "負責人": "謝木土", "地址": "台北市中正區", "緯度": 25.0320, "經度": 121.5190, "簡介": "台灣地區宗親總會"},
-        {"名稱": "新北市謝氏宗親會", "負責人": "謝素姜", "地址": "新北市板橋區中正路", "緯度": 25.0160, "經度": 121.4550, "簡介": "新北地區宗親聯誼會"},
-        {"名稱": "桃園市謝氏宗親會", "負責人": "謝乾源", "地址": "桃園市桃園區三民路", "緯度": 24.9930, "經度": 121.3140, "簡介": "桃園地區宗親聯誼會"},
-        {"名稱": "新竹縣謝氏宗親會", "負責人": "謝建宇", "地址": "新竹縣竹北市", "緯度": 24.8280, "經度": 121.0120, "簡介": "新竹地區宗親聯誼會"},
-        {"名稱": "苗栗縣謝氏宗親會", "負責人": "謝清琳", "地址": "苗栗縣苗栗市", "緯度": 24.5640, "經度": 120.8210, "簡介": "苗栗地區宗親聯誼會"},
-        {"名稱": "台中市謝氏宗親會", "負責人": "謝德良", "地址": "台中市西區民生路", "緯度": 24.1415, "經度": 120.6750, "簡介": "台中地區宗親聯誼會"},
-        {"名稱": "彰化縣謝姓宗親會", "負責人": "謝嚴澤", "地址": "彰化縣彰化市", "緯度": 24.0810, "經度": 120.5380, "簡介": "彰化地區宗親聯誼會"},
-        {"名稱": "嘉義縣謝氏宗親會", "負責人": "謝國村", "地址": "嘉義縣太保市", "緯度": 23.4580, "經度": 120.3230, "簡介": "嘉義地區宗親聯誼會"},
-        {"名稱": "台南市謝氏宗親會", "負責人": "謝龍介", "地址": "台南市中西區民族路", "緯度": 22.9970, "經度": 120.2030, "簡介": "台南地區宗親聯誼會"},
-        {"名稱": "高雄市謝氏宗親會", "負責人": "謝建復", "地址": "高雄市苓雅區建國一路", "緯度": 22.6320, "經度": 120.3200, "簡介": "高雄地區宗親聯誼會"},
-        {"名稱": "屏東縣謝氏宗親會", "負責人": "謝明輝", "地址": "屏東縣屏東市", "緯度": 22.6680, "經度": 120.4850, "簡介": "屏東地區宗親聯誼會"},
-        {"名稱": "花蓮縣謝氏宗親會", "負責人": "謝立德", "地址": "花蓮縣花蓮市中山路", "緯度": 23.9880, "經度": 121.6020, "簡介": "東部地區宗親聯誼會"}
-    ]
+def get_default_coords(text):
+    # 智慧城市定位防呆機制
+    county_coords = {
+        "台北": (25.0645, 121.5295), "新北": (25.0160, 121.4550), "桃園": (24.9930, 121.3140),
+        "新竹": (24.8280, 121.0120), "苗栗": (24.5640, 120.8210), "台中": (24.1415, 120.6750),
+        "彰化": (24.0810, 120.5380), "嘉義": (23.4580, 120.3230), "台南": (22.9970, 120.2030),
+        "高雄": (22.6320, 120.3200), "屏東": (22.6680, 120.4850), "花蓮": (23.9880, 121.6020),
+        "台灣": (25.0320, 121.5190)
+    }
+    for county, coords in county_coords.items():
+        if county in text: return coords
+    return (23.6, 120.9)
 
-    existing_names = [item["名稱"] for item in final_data]
+def add_gps_and_save(df_gov):
+    final_data = []
+    existing_names = []
+    geolocator = Nominatim(user_agent="my_xie_cloud_sync_2026")
 
-    if df is not None and not df.empty:
-        print("🔄 正在轉換政府最新資料的經緯度...")
-        geolocator = Nominatim(user_agent="my_xie_bot_2026")
-        for _, row in df.iterrows():
+    # 🥇 第一優先：載入政府最新的開放資料
+    if df_gov is not None and not df_gov.empty:
+        print("🔄 正在優先處理政府最新開放資料...")
+        for _, row in df_gov.iterrows():
             name = str(row["名稱"]).strip()
-            
-            if name in existing_names or name == 'nan': 
-                continue
+            if name == 'nan' or not name: continue
                 
             addr = str(row["地址"]).strip()
             boss = str(row["負責人"]).strip()
-            
-            lat, lon = 23.6, 120.9 
+            lat, lon = get_default_coords(name + addr) 
             
             if addr != 'nan' and addr:
                 try:
                     location = geolocator.geocode(addr, timeout=3)
-                    if location:
-                        lat, lon = location.latitude, location.longitude
+                    if location: lat, lon = location.latitude, location.longitude
                     time.sleep(1)
                 except:
                     pass 
@@ -87,15 +84,54 @@ def add_gps_and_save(df):
                 "地址": addr if addr != 'nan' else "未提供",
                 "緯度": lat,
                 "經度": lon,
-                "簡介": "政府開放資料最新同步"
+                "簡介": "政府開放資料最新同步 (官方優先)"
             })
+            existing_names.append(name) # 記錄政府已經有的名字
+
+    # 🥈 第二優先：從 Google 試算表補齊政府缺漏的資料
+    print("🔄 正在從 Google 試算表同步自訂名冊...")
+    try:
+        res = requests.get(GOOGLE_SHEET_CSV_URL)
+        res.encoding = 'utf-8'
+        sheet_df = pd.read_csv(io.StringIO(res.text), dtype=str)
+        
+        for _, row in sheet_df.iterrows():
+            name = str(row["名稱"]).strip()
+            
+            # 💡 核心邏輯：如果名字是空的，或是「政府資料已經有了」，就直接跳過不採用！
+            if name == 'nan' or not name or name in existing_names: 
+                continue
+            
+            addr = str(row["地址"]).strip()
+            boss = str(row["負責人"]).strip()
+            intro = str(row["簡介"]).strip()
+            
+            lat, lon = get_default_coords(name + addr)
+            if addr != 'nan' and addr:
+                try:
+                    location = geolocator.geocode(addr, timeout=3)
+                    if location: lat, lon = location.latitude, location.longitude
+                    time.sleep(1)
+                except:
+                    pass
+            
+            final_data.append({
+                "名稱": name,
+                "負責人": boss if boss != 'nan' else "未提供",
+                "地址": addr if addr != 'nan' else "未提供",
+                "緯度": lat,
+                "經度": lon,
+                "簡介": intro if intro != 'nan' else "試算表補充據點"
+            })
+    except Exception as e:
+        print(f"⚠️ 雲端試算表讀取失敗: {e}")
 
     with open("clan_data.py", "w", encoding="utf-8") as f:
         f.write("import pandas as pd\n\n")
         f.write("def get_clan_data():\n")
         f.write(f"    data = {final_data}\n")
         f.write("    return pd.DataFrame(data)\n")
-    print(f"🎉 檔案寫入完畢！共更新 {len(final_data)} 筆。")
+    print(f"🎉 全台地圖資料庫建置完畢！總計 {len(final_data)} 筆據點。")
 
 if __name__ == "__main__":
     df_new = fetch_and_clean_all()
