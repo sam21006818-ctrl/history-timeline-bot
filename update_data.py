@@ -24,7 +24,6 @@ def fetch_and_clean_all():
                 df_clan = df[mask].copy()
                 
                 if not df_clan.empty:
-                    # 🕵️‍♂️ 智慧尋找各縣市不同命名的欄位
                     name_col = next((col for col in df_clan.columns if '名' in col or 'name' in col.lower()), df_clan.columns[0])
                     addr_col = next((col for col in df_clan.columns if '址' in col or 'address' in col.lower()), df_clan.columns[1] if len(df_clan.columns)>1 else df_clan.columns[0])
                     leader_col = next((col for col in df_clan.columns if any(k in str(col) for k in ['負責', '代表', '理事長', '姓名'])), None)
@@ -33,8 +32,8 @@ def fetch_and_clean_all():
                     clean_df = pd.DataFrame({
                         "名稱": df_clan[name_col],
                         "地址": df_clan[addr_col],
-                        "負責人": df_clan[leader_col] if leader_col else "未登記",
-                        "電話": df_clan[phone_col] if phone_col else "未登記"
+                        "負責人": df_clan[leader_col] if leader_col else "未提供",
+                        "電話": df_clan[phone_col] if phone_col else "未提供"
                     })
                     all_clan_data = pd.concat([all_clan_data, clean_df], ignore_index=True)
         except:
@@ -42,43 +41,56 @@ def fetch_and_clean_all():
     return all_clan_data
 
 def add_gps_and_save(df):
-    final_data = []
-    
-    # 如果真的連不上政府網站，提供稍微寫實一點的保底資料
-    real_fallback_data = [
-        {"名稱": "世界謝氏宗親總會", "負責人": "謝國民", "電話": "02-2511-XXXX", "地址": "台北市中山區吉林路286號", "緯度": 25.0645, "經度": 121.5295, "簡介": "全國性宗親總會"},
-        {"名稱": "台南市謝氏宗親會", "負責人": "謝龍介", "電話": "06-222-XXXX", "地址": "台南市中西區民族路", "緯度": 22.9970, "經度": 120.2030, "簡介": "台南地區宗親聯誼會"},
-        {"名稱": "花蓮縣謝氏宗親會", "負責人": "謝立德", "電話": "03-832-XXXX", "地址": "花蓮縣花蓮市中山路", "緯度": 23.9880, "經度": 121.6020, "簡介": "東部地區宗親聯誼會"}
+    # 👑 預設的7筆全國精選資料，當作地圖的「基本盤」
+    final_data = [
+        {"名稱": "世界謝氏宗親總會", "負責人": "依名冊登記", "電話": "未提供", "地址": "台北市中山區吉林路286號", "緯度": 25.0645, "經度": 121.5295, "簡介": "全國性宗親總會"},
+        {"名稱": "新北市謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "新北市板橋區中正路", "緯度": 25.0160, "經度": 121.4550, "簡介": "新北地區宗親聯誼會"},
+        {"名稱": "桃園市謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "桃園市桃園區三民路", "緯度": 24.9930, "經度": 121.3140, "簡介": "桃園地區宗親聯誼會"},
+        {"名稱": "台中市謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "台中市西區民生路", "緯度": 24.1415, "經度": 120.6750, "簡介": "台中地區宗親聯誼會"},
+        {"名稱": "台南市謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "台南市中西區民族路", "緯度": 22.9970, "經度": 120.2030, "簡介": "台南地區宗親聯誼會"},
+        {"名稱": "高雄市謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "高雄市苓雅區建國一路", "緯度": 22.6320, "經度": 120.3200, "簡介": "高雄地區宗親聯誼會"},
+        {"名稱": "花蓮縣謝氏宗親會", "負責人": "依名冊登記", "電話": "未提供", "地址": "花蓮縣花蓮市中山路", "緯度": 23.9880, "經度": 121.6020, "簡介": "東部地區宗親聯誼會"}
     ]
 
-    # 如果爬蟲有抓到真實資料，就使用政府資料
+    # 記錄已經在基本盤裡的名字，避免重複顯示
+    existing_names = [item["名稱"] for item in final_data]
+
+    # 如果有抓到新資料，就把它們疊加進去
     if df is not None and not df.empty:
         print("🔄 正在轉換政府最新資料的經緯度...")
         geolocator = Nominatim(user_agent="my_xie_bot_2026")
         for _, row in df.iterrows():
+            name = str(row["名稱"]).strip()
+            
+            # 如果名字已經在基本盤裡，或是名字是空的，就跳過
+            if name in existing_names or name == 'nan': 
+                continue
+                
             addr = str(row["地址"]).strip()
-            if addr == 'nan' or not addr: continue
-            try:
-                location = geolocator.geocode(addr, timeout=3)
-                if location:
-                    # 清洗空值，將 nan 轉換為更易讀的文字
-                    boss = str(row["負責人"]).strip()
-                    phone = str(row["電話"]).strip()
-                    final_data.append({
-                        "名稱": str(row["名稱"]).strip(),
-                        "負責人": boss if boss != 'nan' else "未提供",
-                        "電話": phone if phone != 'nan' else "未提供",
-                        "地址": addr,
-                        "緯度": location.latitude,
-                        "經度": location.longitude,
-                        "簡介": "政府開放資料最新同步"
-                    })
-                time.sleep(1)
-            except:
-                pass
-    else:
-        # 沒抓到才用保底
-        final_data.extend(real_fallback_data)
+            boss = str(row["負責人"]).strip()
+            phone = str(row["電話"]).strip()
+            
+            # 預設經緯度 (如果地圖辨識不出地址，就先把它丟到台灣中間)
+            lat, lon = 23.6, 120.9 
+            
+            if addr != 'nan' and addr:
+                try:
+                    location = geolocator.geocode(addr, timeout=3)
+                    if location:
+                        lat, lon = location.latitude, location.longitude
+                    time.sleep(1)
+                except:
+                    pass # 如果地圖查不到，依然保留預設經緯度，不把資料丟掉
+                    
+            final_data.append({
+                "名稱": name,
+                "負責人": boss if boss != 'nan' else "未提供",
+                "電話": phone if phone != 'nan' else "未提供",
+                "地址": addr if addr != 'nan' else "未提供",
+                "緯度": lat,
+                "經度": lon,
+                "簡介": "政府開放資料最新同步"
+            })
 
     with open("clan_data.py", "w", encoding="utf-8") as f:
         f.write("import pandas as pd\n\n")
