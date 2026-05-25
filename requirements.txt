@@ -1,4 +1,5 @@
 streamlit
-plotly
-zhconv
-wikipedia
+pandas
+pydeck
+geopy
+requests
