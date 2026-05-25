@@ -1,0 +1,33 @@
+name: 全自動宗親會名冊更新機器人
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'
+  workflow_dispatch: 
+
+jobs:
+  update-data:
+    runs-on: ubuntu-latest
+    steps:
+    - name: 1. 複製專案檔案到雲端機器人
+      uses: actions/checkout@v3
+
+    - name: 2. 安裝 Python 環境
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: 3. 安裝必要套件
+      run: |
+        pip install pandas requests geopy
+
+    - name: 4. 執行自動下載與清洗程式
+      run: python update_data.py
+
+    - name: 5. 將更新後的名冊自動儲存回 GitHub
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action Bot"
+        git add clan_data.py
+        git commit -m "🤖 自動同步最新政府人民團體名冊" || exit 0
+        git push
