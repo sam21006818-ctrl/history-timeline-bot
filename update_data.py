@@ -4,7 +4,7 @@ import io
 import time
 from geopy.geocoders import Nominatim
 
-# 🔗 已經幫您把結尾修正為 pub?output=csv
+# 🔗 已經將結尾修正為 pub?output=csv
 GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR0Ib-gcIDvdoiTJovsjUAflUoA_-NRtg6ZfSdoonmhRSbkc_4bdzzI0w5FbD-DEBI53Vpg3PeALzid/pub?output=csv"
 
 def fetch_and_clean_all():
@@ -48,7 +48,7 @@ def get_default_coords(text):
         "台北": (25.0645, 121.5295), "新北": (25.0160, 121.4550), "桃園": (24.9930, 121.3140),
         "新竹": (24.8280, 121.0120), "苗栗": (24.5640, 120.8210), "台中": (24.1415, 120.6750),
         "彰化": (24.0810, 120.5380), "嘉義": (23.4580, 120.3230), "台南": (22.9970, 120.2030),
-        "高雄": (22.6320, 120.3200), "屏東": (22.6680, 120.4850), "花蓮": (23.9880, 121.6020),
+        "高雄": (22.6320, 120.3200), "屏雨": (22.6680, 120.4850), "花蓮": (23.9880, 121.6020),
         "台灣": (25.0320, 121.5190), "金門": (24.449, 118.388)
     }
     for county, coords in county_coords.items():
@@ -102,8 +102,19 @@ def add_gps_and_save(df_gov):
             phone = str(row.get("電話", "無")).strip()
             fax = str(row.get("傳真", "無")).strip()
             
+            # 💡 核心變更：讀取試算表中的自訂經緯度
+            custom_lat = str(row.get("緯度", "")).strip()
+            custom_lon = str(row.get("經度", "")).strip()
+            
             lat, lon = get_default_coords(name + addr)
-            if addr != 'nan' and addr:
+            
+            # 若表中已填寫數字，強制套用自訂經緯度！
+            if custom_lat and custom_lon and custom_lat != 'nan' and custom_lon != 'nan':
+                try:
+                    lat = float(custom_lat)
+                    lon = float(custom_lon)
+                except: pass
+            elif addr != 'nan' and addr: # 否則交給引擎自動轉換
                 try:
                     location = geolocator.geocode(addr, timeout=3)
                     if location: lat, lon = location.latitude, location.longitude
