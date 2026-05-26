@@ -4,8 +4,8 @@ import io
 import time
 from geopy.geocoders import Nominatim
 
-# 🔗 【重要設定】請在下方雙引號內，貼上您在 Google 表單發布的 CSV 長網址
-GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR0Ib-gcIDvdoiTJovsjUAflUoA_-NRtg6ZfSdoonmhRSbkc_4bdzzI0w5FbD-DEBI53Vpg3PeALzid/pubhtml"
+# 🔗 已經幫您把結尾修正為 pub?output=csv
+GOOGLE_SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/e/2PACX-1vR0Ib-gcIDvdoiTJovsjUAflUoA_-NRtg6ZfSdoonmhRSbkc_4bdzzI0w5FbD-DEBI53Vpg3PeALzid/pub?output=csv"
 
 def fetch_and_clean_all():
     print("🔄 嘗試連線至內政部與開放 API 縣市資料庫...")
@@ -66,7 +66,8 @@ def add_gps_and_save(df_gov):
             name = str(row["名稱"]).strip()
             if name == 'nan' or not name: continue
                 
-            addr, boss = str(row["地址"]).strip(), str(row["負責人"]).strip()
+            addr = str(row["地址"]).strip()
+            boss = str(row["負責人"]).strip()
             phone = str(row.get("電話", "政府未公開")).strip()
             fax = str(row.get("傳真", "政府未公開")).strip()
             lat, lon = get_default_coords(name + addr) 
@@ -95,7 +96,9 @@ def add_gps_and_save(df_gov):
             name = str(row["名稱"]).strip()
             if name == 'nan' or not name or name in existing_names: continue
             
-            addr, boss, intro = str(row["地址"]).strip(), str(row["負責人"]).strip(), str(row["簡介"]).strip()
+            addr = str(row["地址"]).strip()
+            boss = str(row["負責人"]).strip()
+            intro = str(row["簡介"]).strip()
             phone = str(row.get("電話", "無")).strip()
             fax = str(row.get("傳真", "無")).strip()
             
