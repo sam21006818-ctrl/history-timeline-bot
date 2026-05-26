@@ -31,6 +31,7 @@ layer = pdk.Layer(
 view_state = pdk.ViewState(latitude=23.7, longitude=121.0, zoom=6.5, pitch=0)
 
 st.pydeck_chart(pdk.Deck(
+    map_style="road",  # 💡 就是加了這一行！讓黑夜變成明亮的白晝街道圖
     layers=[layer],
     initial_view_state=view_state,
     tooltip={
